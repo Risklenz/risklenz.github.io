@@ -69,6 +69,8 @@ th{background:var(--bg);font-weight:600}
   <a href="#risk">Risk calculation</a>
   <a href="#case">Case</a>
   <a href="#decision">Clear / reject</a>
+  <h4>ID verification</h4>
+  <a href="#idv">Verify ID + face</a>
   <h4>Screening</h4>
   <a href="#screening">Screen a name</a>
   <a href="#screening-report">Screening report</a>
@@ -276,6 +278,36 @@ th{background:var(--bg);font-weight:600}
 <p><code>decision</code>: <code>Onboard</code> (clear) or <code>Reject</code>. One call does the whole review. The remark is saved on every matched relation (shareholders, directors, UBOs) and on the customer, then the case is closed. Everything is kept in the case activity, as in the portal.</p>
 <div class="note">The case should be cleared only after a compliance officer has checked the matches. The remark is the audit trail.</div>
 
+<h2 id="idv">ID verification (document + face)</h2>
+<p>This checks the customer's ID document, liveness and face match, plus device and IP, through our verification partner. The customer completes it on a secure hosted page, on their phone or computer.</p>
+<ol class="flow">
+  <li>Start a session for the customer: <code>POST /api/customers/{id}/idv</code>. You get a <code>url</code>. Send it to the customer, or open it for them.</li>
+  <li>The customer photographs the ID and takes a short selfie video on that page.</li>
+  <li>The result is stored with the customer as soon as it is ready. Read it with <code>GET /api/idv/{sessionId}</code>.</li>
+</ol>
+<div class="card">
+  <div class="ep"><span class="m post">POST</span>/api/customers/{id}/idv</div>
+  <div class="ep" style="margin-top:6px"><span class="m get">GET</span>/api/customers/{id}/idv<span style="color:var(--muted)">  → the customer's sessions</span></div>
+  <div class="ep" style="margin-top:6px"><span class="m get">GET</span>/api/idv/{sessionId}<span style="color:var(--muted)">  → the result (<code>?raw=true</code> adds the full decision)</span></div>
+  <div class="ep" style="margin-top:6px"><span class="m post">POST</span>/api/idv/{sessionId}/refresh<span style="color:var(--muted)">  → fetch the latest result now</span></div>
+  <div class="ep" style="margin-top:6px"><span class="m get">GET</span>/api/idv/{sessionId}/files/{name}<span style="color:var(--muted)">  → a stored image</span></div>
+</div>
+<p>The body of the start call is optional: <code>{ "language": "en", "callbackUrl": "https://your-site/after-check" }</code>. <code>callbackUrl</code> is where the customer goes when done.</p>
+<pre>POST /api/customers/RL9002-1108-07/idv
+{ "success": true, "sessionId": "c1d2…", "url": "https://verify.didit.me/session/…", "status": "Not Started", "customerNo": "RL9002-1108-07" }
+
+GET /api/idv/c1d2…
+{ "success": true, "result": {
+    "status": "Approved",
+    "document": { "status": "Approved", "type": "Identity Card", "number": "784-1990-1234567-1", "firstName": "…", "lastName": "…",
+                  "dateOfBirth": "1990-05-05", "nationality": "IND", "issuingState": "United Arab Emirates", "expiryDate": "2028-01-01" },
+    "liveness":  { "status": "Approved", "score": "98" },
+    "faceMatch": { "status": "Approved", "score": "91.5" },
+    "ipCheck":   { "status": "Approved", "ip": "…", "country": "AE" },
+    "files": [ { "name": "id_verification.front_image.jpg", "url": "/api/idv/c1d2…/files/id_verification.front_image.jpg" } ] } }</pre>
+<p><code>status</code> is one of: <code>Not Started</code>, <code>In Progress</code>, <code>In Review</code>, <code>Approved</code>, <code>Declined</code>, <code>Abandoned</code>, <code>Expired</code>. Check it until it is final, or read it when the customer returns to your <code>callbackUrl</code>.</p>
+<div class="note">The document data and the images are kept in RiskLens360's own storage, not only with the verification partner, so they stay available for the 5-year UAE record-keeping period.</div>
+
 <h2 id="screening">Screen a name</h2>
 <div class="card"><div class="ep"><span class="m post">POST</span>/api/screening</div></div>
 <p>This screens a name the same way as the portal's Instant Watchlist Check. It is saved in the Screening Log, shown as "Screened by: API: &lt;client name&gt;".</p>
@@ -348,6 +380,11 @@ th{background:var(--bg);font-weight:600}
   <tr><td>GET</td><td><code>/api/customers/{id}/case</code></td><td>Case: parties, remarks, activity</td></tr>
   <tr><td>POST</td><td><code>/api/customers/{id}/case/review</code></td><td>Review remark</td></tr>
   <tr><td>POST</td><td><code>/api/customers/{id}/case/decision</code></td><td>Onboard (clear) / Reject</td></tr>
+  <tr><td>POST</td><td><code>/api/customers/{id}/idv</code></td><td>Start ID verification (link for the customer)</td></tr>
+  <tr><td>GET</td><td><code>/api/customers/{id}/idv</code></td><td>The customer's ID verification sessions</td></tr>
+  <tr><td>GET</td><td><code>/api/idv/{sessionId}</code></td><td>ID verification result</td></tr>
+  <tr><td>POST</td><td><code>/api/idv/{sessionId}/refresh</code></td><td>Fetch the latest result now</td></tr>
+  <tr><td>GET</td><td><code>/api/idv/{sessionId}/files/{name}</code></td><td>A stored ID / selfie image</td></tr>
   <tr><td>POST</td><td><code>/api/screening</code></td><td>Screen a name</td></tr>
   <tr><td>GET</td><td><code>/api/screening/{screeningId}</code></td><td>A saved screening</td></tr>
   <tr><td>GET</td><td><code>/api/screening/{screeningId}/report</code></td><td>Screening report (HTML)</td></tr>
